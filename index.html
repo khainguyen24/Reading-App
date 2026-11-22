@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Reading">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#121314">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Reading Practice</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Lexend:wght@400;500&display=swap">
+<style>
+/* Same dark look as the Math Facts Trainer */
+:root {
+  color-scheme: dark;
+  --bg: #121314; --surface: #191a1b; --ink: #cccccc; --muted: #8c8c8c; --line: #2b2c2e;
+  --accent: #4a9fd0; --accent-strong: #297aa0; --active: #2a2d2e; --active-ink: #e2c08d;
+  --good: #19e36b; --bad: #f48771; --chip: #1e1e1f;
+  --f-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  --f-read: "Lexend", "Verdana", system-ui, sans-serif;
+  --read-size: 24px;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-body); -webkit-tap-highlight-color: transparent; }
+main { max-width: 760px; margin: 0 auto; padding: 24px max(16px, env(safe-area-inset-left, 0px)) 48px; display: grid; gap: 22px; grid-template-columns: minmax(0, 1fr); }
+h1, h2, h3 { font-family: var(--f-display); margin: 0; }
+h1 { font-size: clamp(28px, 5vw, 36px); letter-spacing: -0.01em; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-family: var(--f-body); font-weight: 600; }
+h3 { font-size: 20px; }
+.sub { color: var(--muted); margin: 4px 0 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 14px; }
+.row { display: grid; gap: 8px; }
+.label { font-size: 13px; color: var(--muted); font-weight: 600; display: flex; gap: 10px; align-items: baseline; }
+.label a { color: var(--accent); font-weight: 500; cursor: pointer; text-decoration: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 500 14px var(--f-body); border: 1px solid var(--line); background: var(--chip); color: var(--ink); border-radius: 999px; padding: 6px 14px; cursor: pointer; min-width: 44px; }
+.chip:hover { border-color: var(--accent); }
+.chip[aria-pressed="true"] { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; }
+.play { font: 600 17px var(--f-body); background: var(--accent-strong); color: #fff; border: 0; border-radius: 999px; padding: 14px 30px; cursor: pointer; }
+.btn { font: 600 14px var(--f-body); background: var(--active); color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 9px 18px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; }
+.btn.danger { color: var(--bad); }
+button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.acts { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.grow { flex: 1; }
+.hint { color: var(--muted); font-size: 13px; }
+.mono { font-family: var(--f-mono); }
+[hidden] { display: none !important; }
+.top { display: flex; align-items: center; gap: 10px; }
+.back { background: none; border: 0; color: var(--accent); font: 600 15px var(--f-body); cursor: pointer; padding: 6px 0; }
+
+/* Story list */
+.stories { display: grid; gap: 10px; }
+.story { text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; cursor: pointer; color: var(--ink); font: inherit; display: grid; gap: 8px; }
+.story:hover { border-color: var(--accent); }
+.story.current { border-color: var(--active-ink); }
+.story .t { font: 700 19px var(--f-display); display: flex; gap: 8px; align-items: baseline; }
+.story .t .pin { font: 600 11px var(--f-body); color: var(--active-ink); text-transform: uppercase; letter-spacing: .08em; }
+.story .meta { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+.story .meta b { color: var(--ink); font-weight: 600; }
+.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--good); }
+
+/* Week strip, like the "record how long it takes you each day" box */
+.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.day { background: var(--chip); border: 1px solid var(--line); border-radius: 10px; padding: 8px 4px; text-align: center; }
+.day .d { font-size: 12px; color: var(--muted); font-weight: 600; }
+.day .v { font: 600 14px var(--f-mono); color: var(--ink); min-height: 21px; }
+.day.today { border-color: var(--accent); }
+.day.has .v { color: var(--good); }
+
+/* Charts */
+.chart { width: 100%; height: auto; display: block; }
+.chart text { fill: var(--muted); font: 11px var(--f-body); }
+.stat { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.stat > div { background: var(--chip); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.stat .n { font: 600 22px var(--f-mono); color: var(--ink); }
+.stat .k { font-size: 12px; color: var(--muted); }
+table.log { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.log th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+table.log td { padding: 7px 4px; border-bottom: 1px solid var(--line); }
+table.log td.mono { white-space: nowrap; }
+
+/* ===== Focus reading mode: nothing on screen but the story ===== */
+#read { position: fixed; inset: 0; z-index: 50; background: #151617; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+#read .page { max-width: 40em; margin: 0 auto; padding: max(48px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) 80px max(24px, env(safe-area-inset-left)); }
+#read h1 { font: 500 calc(var(--read-size) * 1.35) var(--f-read); color: #e6e6e6; margin: 0 0 1em; letter-spacing: 0; }
+#read .txt p { font: 400 var(--read-size)/1.85 var(--f-read); color: #dedede; margin: 0 0 1em; letter-spacing: .01em; word-spacing: .08em; }
+#read .doneRead { display: block; margin: 2.2em auto 0; font: 500 18px var(--f-read); background: transparent; color: #bdbdbd; border: 1px solid #3a3b3d; border-radius: 999px; padding: 14px 34px; cursor: pointer; }
+#read .doneRead:hover { border-color: var(--accent); color: #fff; }
+/* A quiet way out, barely visible so it doesn't pull her eyes */
+#read .quit { position: fixed; top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); background: none; border: 0; color: #fff; opacity: .12; font-size: 22px; width: 44px; height: 44px; cursor: pointer; }
+#read .quit:hover, #read .quit:focus-visible { opacity: .6; }
+body.reading { overflow: hidden; }
+/* Read-aloud: each word lights up blue as it's spoken */
+#read .w { border-radius: 5px; transition: background-color .12s, color .12s; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+#read .w.on { color: #fff; background: #2f86c4; box-shadow: 0 0 0 3px #2f86c4; }
+#read.listen .snt { cursor: pointer; }
+#read .lbar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 10px; padding: 12px 12px max(12px, env(safe-area-inset-bottom)); background: linear-gradient(transparent, #151617 35%); }
+#read .lbar .play { padding: 12px 34px; min-width: 130px; }
+
+/* Finish card */
+.big { font: 600 clamp(44px, 12vw, 64px) var(--f-mono); color: var(--good); letter-spacing: -0.02em; }
+.cmp { font-size: 15px; }
+.cmp .up { color: var(--good); } .cmp .down { color: var(--active-ink); }
+
+/* Questions */
+.qwrap { display: grid; gap: 18px; }
+.restate { font: 600 15px var(--f-body); color: var(--active-ink); }
+.qsec { display: grid; gap: 14px; }
+.q { display: grid; gap: 6px; }
+.q .qt { font-size: 16px; color: #e0e0e0; }
+.q .qt .tag { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .08em; margin-right: 6px; }
+.q .qt .num { color: var(--muted); margin-right: 4px; }
+.q textarea, .q input[type=text], dialog textarea, dialog input[type=text] { width: 100%; font: 400 17px/1.55 var(--f-read); background: #141516; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; resize: vertical; }
+.q textarea { min-height: 84px; }
+.q.done textarea, .q.done input { border-color: #1f5b37; }
+.q .l3 { display: grid; gap: 6px; }
+.q .l3 label { display: grid; grid-template-columns: 22px 1fr; align-items: center; color: var(--muted); }
+.drawbox { position: relative; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #f7f5ef; }
+.drawbox canvas { display: block; width: 100%; height: 300px; touch-action: none; cursor: crosshair; }
+.drawbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.pen { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; }
+.pen[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
+.lookback { background: #151617; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+.lookback p { font: 400 17px/1.75 var(--f-read); color: #d6d6d6; margin: 0 0 .8em; }
+@media (min-width: 1100px) {
+  body.wide main { max-width: 1240px; }
+  body.wide .qgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+  body.wide .lookback { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+}
+.saved { font-size: 12px; color: var(--muted); }
+
+/* Dialogs */
+dialog { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 14px; padding: 18px; width: min(640px, 94vw); max-height: 92vh; }
+dialog::backdrop { background: rgba(0,0,0,.6); }
+dialog .row { margin-bottom: 12px; }
+dialog textarea { min-height: 120px; font-size: 15px; }
+.who { display: flex; flex-wrap: wrap; gap: 6px; }
+.sizes .chip { font-family: var(--f-read); }
+</style>
+</head>
+<body>
+<main>
+  <!-- ===== Home ===== -->
+  <section id="home" style="display:grid;gap:22px">
+    <header>
+      <h1>Reading Practice</h1>
+      <p class="sub">Read the story aloud, then answer the questions. Your time is saved for you.</p>
+    </header>
+
+    <div class="panel">
+      <div class="row">
+        <span class="label">Who's reading? <a id="editUser">Rename / remove</a></span>
+        <div class="who" id="who"></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="acts"><h2 class="grow">Stories</h2><button class="btn" id="progressBtn">My progress</button></div>
+      <div class="stories" id="storyList"></div>
+      <div class="acts"><button class="btn" id="addStoryBtn">+ Add a story</button><span class="hint">Type in a new passage and its questions from school.</span></div>
+    </div>
+  </section>
+
+  <!-- ===== One story: start reading, see this week's times, go to questions ===== -->
+  <section id="story" hidden style="display:grid;gap:20px">
+    <div class="top"><button class="back" data-go="home">‹ Stories</button><span class="grow"></span><button class="btn" id="editStoryBtn" hidden>Edit story</button></div>
+    <header>
+      <h1 id="sTitle"></h1>
+      <p class="sub" id="sMeta"></p>
+    </header>
+    <div class="panel">
+      <p style="margin:0;font-size:16px"><b>Read the entire passage aloud.</b> When you finish, tap <i>I'm done reading</i> and your time is saved for today.</p>
+      <div class="acts">
+        <button class="play" id="startBtn">Start reading</button>
+        <button class="btn" id="listenBtn">🔊 Listen to the story</button>
+        <button class="btn" id="toQsBtn">Questions</button>
+      </div>
+      <p class="hint" style="margin:-4px 0 0">Listening isn't timed. Only <i>Start reading</i> saves a time.</p>
+      <div class="row">
+        <span class="label">Text size</span>
+        <div class="chips sizes" id="sizeChips"></div>
+      </div>
+      <div class="row" id="voiceRow">
+        <span class="label">Read-aloud voice <a id="moreVoices"></a></span>
+        <div class="chips" id="voiceChips"></div>
+        <span class="hint" id="voiceHint"></span>
+      </div>
+      <div class="row" id="rateRow">
+        <span class="label">Read-aloud speed</span>
+        <div class="chips" id="rateChips"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="acts"><h2 class="grow">This week</h2><span class="hint" id="weekHint"></span></div>
+      <div class="week" id="week"></div>
+    </div>
+    <div class="panel" id="sHistPanel">
+      <h2>Every read</h2>
+      <div id="sChart"></div>
+      <table class="log" id="sLog"></table>
+    </div>
+    <div class="acts"><button class="btn" id="pinBtn"></button><span class="hint">The story marked "This week" goes to the top of the list.</span></div>
+  </section>
+
+  <!-- ===== After reading ===== -->
+  <section id="finish" hidden style="display:grid;gap:20px">
+    <header>
+      <h1>Nice reading!</h1>
+      <p class="sub" id="fTitle"></p>
+    </header>
+    <div class="panel" style="text-align:center;justify-items:center">
+      <div class="hint">Your time</div>
+      <div class="big" id="fTime"></div>
+      <div class="cmp" id="fCmp"></div>
+    </div>
+    <div class="acts" style="justify-content:center">
+      <button class="play" id="fQs">Go to questions</button>
+      <button class="btn" id="fAgain">Read it again</button>
+      <button class="btn" data-go="home">Back to stories</button>
+    </div>
+  </section>
+
+  <!-- ===== Questions ===== -->
+  <section id="qs" hidden style="display:grid;gap:18px">
+    <div class="top"><button class="back" id="qsBack">‹ Back</button><span class="grow"></span><span class="saved" id="qSaved"></span><button class="btn" id="lookBtn">Show the story</button></div>
+    <header>
+      <h1 id="qTitle"></h1>
+      <p class="restate">Make sure to restate the question!</p>
+      <div class="acts" style="margin-top:6px"><div class="bar grow" style="max-width:260px"><i id="qBar"></i></div><span class="hint" id="qCount"></span></div>
+    </header>
+    <div class="qgrid">
+      <div class="lookback" id="lookback" hidden></div>
+      <div class="qwrap" id="qList"></div>
+    </div>
+    <div class="acts"><button class="play" id="qDone">All done</button></div>
+  </section>
+
+  <!-- ===== Progress ===== -->
+  <section id="progress" hidden style="display:grid;gap:20px">
+    <div class="top"><button class="back" data-go="home">‹ Stories</button></div>
+    <header><h1 id="pTitle">Progress</h1><p class="sub">Every timed read and every answered question.</p></header>
+    <div class="stat" id="pStats"></div>
+    <div class="panel"><h2>Reading time this week</h2><div class="week" id="pWeek"></div></div>
+    <div class="panel"><h2>Words per minute, every read</h2><div id="pChart"></div><p class="hint" style="margin:0">Words per minute lets you compare different stories. Higher is faster.</p></div>
+    <div class="panel"><h2>By story</h2><table class="log" id="pTable"></table></div>
+  </section>
+</main>
+
+<!-- ===== Focus reading screen ===== -->
+<div id="read" hidden>
+  <button class="quit" id="quitRead" aria-label="Stop without saving">×</button>
+  <div class="page">
+    <h1 id="rTitle"></h1>
+    <div class="txt" id="rText"></div>
+    <button class="doneRead" id="doneRead">I'm done reading</button>
+    <div style="height:90px" id="lpad" hidden></div>
+  </div>
+  <div class="lbar" id="lbar" hidden>
+    <button class="btn" id="lRestart" aria-label="Start over">↺ Start over</button>
+    <button class="play" id="lPlay">Pause</button>
+    <button class="btn" id="lDone">Done</button>
+  </div>
+</div>
+
+<!-- Player dialog -->
+<dialog id="userDlg">
+  <h3 id="userDlgT" style="margin-bottom:12px">Player</h3>
+  <div class="row"><span class="label">Name</span><input type="text" id="userName" maxlength="24"></div>
+  <div class="acts"><button class="btn danger" id="userDel" hidden>Remove player</button><span class="grow"></span><button class="btn" id="userCancel">Cancel</button><button class="btn primary" id="userSave">Save</button></div>
+</dialog>
+
+<!-- Add / edit story dialog -->
+<dialog id="storyDlg">
+  <h3 id="storyDlgT" style="margin-bottom:12px">Add a story</h3>
+  <div class="row"><span class="label">Title</span><input type="text" id="nsTitle" maxlength="80"></div>
+  <div class="row"><span class="label">Story text</span><textarea id="nsText" placeholder="Type or paste the passage. Leave a blank line between paragraphs."></textarea></div>
+  <div class="row"><span class="label">Questions, one per line</span>
+    <textarea id="nsQs" placeholder="Literal:&#10;What did Katie spend her days doing?&#10;Inferential:&#10;What was the problem in the story?&#10;Applied:&#10;Did you enjoy reading this story? Why/Why not?"></textarea>
+    <span class="hint">A line ending in a colon, like "Literal:", starts a new section.</span>
+  </div>
+  <div class="acts"><button class="btn danger" id="nsDel" hidden>Delete story</button><span class="grow"></span><button class="btn" id="nsCancel">Cancel</button><button class="btn primary" id="nsSave">Save</button></div>
+</dialog>
+
+<script src="stories.js"></script>
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const KEY = "reading:v1";
+  const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(KEY + ":" + k)); return v ?? d; } catch (e) { return d; } };
+  const save = (k, v) => { try { localStorage.setItem(KEY + ":" + k, JSON.stringify(v)); } catch (e) {} };
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  // ---- Stories: the built-in ones from school plus any typed in here -------------------------------
+  let custom = load("custom", []);
+  const allStories = () => window.STORIES.concat(custom);
+  const story = id => allStories().find(s => s.id === id);
+  const paras = s => s.text.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+  const wordCount = s => s.text.split(/\s+/).filter(w => /[A-Za-z0-9]/.test(w)).length;
+  // Turn a story's questions into one flat list with stable ids
+  function questions(s) {
+    if (s.sections) return s.sections.flatMap((sec, i) => sec.qs.map((q, j) => ({ id: `c${i}.${j}`, sec: sec.name, n: j + 1, q, kind: "text" })));
+    const out = [];
+    (s.think || []).forEach((t, i) => out.push({ id: "w" + i, sec: "Think about it", tag: t.tag, q: t.q, kind: t.kind || "text" }));
+    [["literal", "Literal", "L"], ["inferential", "Inferential", "I"], ["applied", "Applied", "A"]].forEach(([k, name, p]) =>
+      (s[k] || []).forEach((q, i) => out.push({ id: p + (i + 1), sec: name, n: i + 1, q, kind: "text" })));
+    return out;
+  }
+
+  // ---- Players ------------------------------------------------------------------------------------
+  let users = load("users", []);
+  if (!users.length) { users = [{ id: "u1", name: "Ella" }]; save("users", users); }
+  let uid = load("user", users[0].id);
+  if (!users.some(u => u.id === uid)) uid = users[0].id;
+  // S: settings, R: timed reads [{ s: storyId, ms, at }], A: answers { storyId: { qid: text | [a,b,c] | dataURL } }
+  let S, R, A;
+  function loadUser(id) {
+    uid = id; save("user", uid);
+    S = Object.assign({ size: 24, current: "" }, load("settings:" + uid, {}));
+    R = load("reads:" + uid, []);
+    A = load("answers:" + uid, {});
+  }
+  loadUser(uid);
+  const saveU = (k, v) => save(k + ":" + uid, v);
+  const userName = () => (users.find(u => u.id === uid) || {}).name || "";
+
+  // ---- Helpers ------------------------------------------------------------------------------------
+  // Same format as the worksheet: 1:09.09
+  function fmt(ms) {
+    const cs = Math.round(ms / 10), m = Math.floor(cs / 6000), s = Math.floor(cs / 100) % 60, c = cs % 100;
+    return `${m}:${String(s).padStart(2, "0")}.${String(c).padStart(2, "0")}`;
+  }
+  const fmtShort = ms => { const t = Math.round(ms / 1000); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`; };
+  const wpm = (s, ms) => Math.round(wordCount(s) / (ms / 60000));
+  const dayKey = d => { d = new Date(d); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  function weekDates() {
+    const now = new Date(), d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));  // back to Monday
+    return DAYS.map((_, i) => { const x = new Date(d); x.setDate(d.getDate() + i); return dayKey(x); });
+  }
+  const readsOf = sid => R.filter(r => r.s === sid);
+  const best = sid => { const r = readsOf(sid); return r.length ? Math.min(...r.map(x => x.ms)) : 0; };
+  const isAnswered = v => Array.isArray(v) ? v.every(x => x && x.trim()) : !!(v && String(v).trim());
+  const answeredCount = s => { const a = A[s.id] || {}; return questions(s).filter(q => isAnswered(a[q.id])).length; };
+
+  // ---- Screens ------------------------------------------------------------------------------------
+  const SCREENS = ["home", "story", "finish", "qs", "progress"];
+  let cur = null;  // the story being worked on
+  function show(id) {
+    SCREENS.forEach(s => $(s).hidden = s !== id);
+    document.body.classList.toggle("wide", id === "qs" && !$("lookback").hidden);
+    if (id === "home") drawHome();
+    if (id === "story") drawStory();
+    if (id === "progress") drawProgress();
+    window.scrollTo(0, 0);
+  }
+  document.addEventListener("click", e => { const g = e.target.closest("[data-go]"); if (g) show(g.dataset.go); });
+
+  // ---- Home ---------------------------------------------------------------------------------------
+  function drawUsers() {
+    $("who").innerHTML = users.map(u => `<button class="chip" data-uid="${u.id}" aria-pressed="${u.id === uid}">${esc(u.name)}</button>`).join("") +
+      `<button class="chip" id="addUser">+ Add</button>`;
+  }
+  $("who").addEventListener("click", e => {
+    const b = e.target.closest("[data-uid]");
+    if (b) { loadUser(b.dataset.uid); drawHome(); }
+    else if (e.target.id === "addUser") openUser(null);
+  });
+  function drawHome() {
+    drawUsers();
+    const week = weekDates(), list = allStories().slice();
+    list.sort((a, b) => (b.id === S.current) - (a.id === S.current));
+    $("storyList").innerHTML = list.map(s => {
+      const reads = readsOf(s.id), b = best(s.id), qs = questions(s), done = answeredCount(s);
+      const thisWeek = new Set(reads.filter(r => week.includes(dayKey(r.at))).map(r => dayKey(r.at))).size;
+      return `<button class="story${s.id === S.current ? " current" : ""}" data-sid="${s.id}">
+        <span class="t">${esc(s.title)}${s.id === S.current ? `<span class="pin">This week</span>` : ""}</span>
+        <span class="meta"><span>${wordCount(s)} words</span>
+          <span>Read <b>${thisWeek}</b> day${thisWeek === 1 ? "" : "s"} this week</span>
+          ${b ? `<span>Best <b class="mono">${fmt(b)}</b></span>` : ""}
+          <span>Questions <b>${done}/${qs.length}</b></span></span>
+        <span class="bar"><i style="width:${qs.length ? done / qs.length * 100 : 0}%"></i></span>
+      </button>`;
+    }).join("");
+  }
+  $("storyList").addEventListener("click", e => { const b = e.target.closest("[data-sid]"); if (b) { cur = story(b.dataset.sid); show("story"); } });
+  $("progressBtn").onclick = () => show("progress");
+
+  // ---- One story ----------------------------------------------------------------------------------
+  const SIZES = [20, 24, 28, 32];
+  function drawStory() {
+    const s = cur, reads = readsOf(s.id), qs = questions(s);
+    $("sTitle").textContent = s.title;
+    $("sMeta").textContent = `${wordCount(s)} words · ${qs.length} questions, ${answeredCount(s)} answered`;
+    $("editStoryBtn").hidden = !s.custom;
+    $("sizeChips").innerHTML = SIZES.map(n => `<button class="chip" data-size="${n}" aria-pressed="${S.size === n}" style="font-size:${n * 0.6}px">Aa</button>`).join("");
+    drawWeek($("week"), reads);
+    $("weekHint").textContent = reads.length ? `Best ever ${fmt(best(s.id))}` : "";
+    $("sHistPanel").hidden = !reads.length;
+    if (reads.length) {
+      $("sChart").innerHTML = barChart(reads.map(r => ({ v: r.ms / 1000, label: new Date(r.at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) })), v => fmtShort(v * 1000), true);
+      $("sLog").innerHTML = `<tr><th>Day</th><th>Time</th><th>Words / min</th><th></th></tr>` + reads.slice().reverse().map(r =>
+        `<tr><td>${new Date(r.at).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</td><td class="mono">${fmt(r.ms)}</td><td class="mono">${wpm(s, r.ms)}</td><td style="text-align:right"><button class="back" data-del="${r.at}" title="Delete this time" style="color:var(--muted)">×</button></td></tr>`).join("");
+    }
+    drawVoices();
+    $("pinBtn").textContent = S.current === s.id ? "Unmark as this week's story" : "Mark as this week's story";
+  }
+  $("sizeChips").addEventListener("click", e => { const b = e.target.closest("[data-size]"); if (!b) return; S.size = +b.dataset.size; saveU("settings", S); drawStory(); });
+  $("sLog").addEventListener("click", e => {
+    const b = e.target.closest("[data-del]"); if (!b) return;
+    const r = R.find(x => x.at === b.dataset.del && x.s === cur.id); if (!r) return;
+    if (!confirm(`Delete the ${fmt(r.ms)} read from ${new Date(r.at).toLocaleDateString()}?`)) return;
+    R = R.filter(x => x !== r); saveU("reads", R); drawStory();
+  });
+  $("pinBtn").onclick = () => { S.current = S.current === cur.id ? "" : cur.id; saveU("settings", S); drawStory(); };
+  $("toQsBtn").onclick = () => openQs("story");
+
+  // Fastest time each day this week, Monday to Sunday
+  function drawWeek(el, reads, total) {
+    const week = weekDates(), today = dayKey(new Date());
+    el.innerHTML = week.map((k, i) => {
+      const day = reads.filter(r => dayKey(r.at) === k);
+      let v = "";
+      if (day.length) v = total ? fmtShort(day.reduce((a, r) => a + r.ms, 0)) : fmt(Math.min(...day.map(r => r.ms)));
+      return `<div class="day${k === today ? " today" : ""}${day.length ? " has" : ""}"><div class="d">${DAYS[i]}</div><div class="v">${v || "&nbsp;"}</div>${day.length > 1 && !total ? `<div class="hint">×${day.length}</div>` : ""}</div>`;
+    }).join("");
+  }
+
+  // Simple bar chart. lowerIsBetter colours the best bar green.
+  function barChart(pts, label, lowerIsBetter) {
+    pts = pts.slice(-20);
+    const W = 640, H = 180, pad = 26, n = pts.length, max = Math.max(...pts.map(p => p.v)) * 1.15 || 1;
+    const bw = Math.min(46, (W - 20) / n - 6), gap = (W - 20 - bw * n) / Math.max(n, 1);
+    const bestV = lowerIsBetter ? Math.min(...pts.map(p => p.v)) : Math.max(...pts.map(p => p.v));
+    let g = "";
+    pts.forEach((p, i) => {
+      const x = 10 + gap / 2 + i * (bw + gap), h = (H - pad * 2) * p.v / max, y = H - pad - h;
+      g += `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="4" fill="${p.v === bestV ? "#19e36b" : "#297aa0"}"/>`;
+      g += `<text x="${x + bw / 2}" y="${y - 6}" text-anchor="middle">${label(p.v)}</text>`;
+      if (n <= 10 || i % Math.ceil(n / 10) === 0) g += `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${esc(p.label)}</text>`;
+    });
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">${g}<line x1="0" x2="${W}" y1="${H - pad}" y2="${H - pad}" stroke="#2b2c2e"/></svg>`;
+  }
+
+  // ---- Focus reading: the timer runs, but nothing about it is on screen ---------------------------
+  let t0 = 0, wake = null;
+  function startReading(listen) {
+    const s = cur;
+    listen = listen === true;
+    document.documentElement.style.setProperty("--read-size", S.size + "px");
+    $("rTitle").textContent = s.title;
+    $("rText").innerHTML = listen ? Speaker.render(s) : paras(s).map(p => `<p>${esc(p)}</p>`).join("");
+    $("read").classList.toggle("listen", listen);
+    $("doneRead").hidden = listen; $("lbar").hidden = !listen; $("lpad").hidden = !listen;
+    $("read").hidden = false; $("read").scrollTop = 0;
+    document.body.classList.add("reading");
+    const el = document.documentElement;
+    try { if (el.requestFullscreen) el.requestFullscreen().catch(() => {}); } catch (e) {}
+    try { if (navigator.wakeLock) navigator.wakeLock.request("screen").then(w => wake = w).catch(() => {}); } catch (e) {}
+    t0 = performance.now();
+  }
+  function stopReading() {
+    Speaker.stop();
+    $("read").hidden = true;
+    document.body.classList.remove("reading");
+    try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
+    try { if (wake) wake.release(); } catch (e) {} wake = null;
+  }
+  $("startBtn").onclick = () => startReading(false);
+  $("fAgain").onclick = () => startReading(false);
+  $("listenBtn").onclick = () => { startReading(true); t0 = 0; Speaker.play(0); };
+  $("lDone").onclick = () => { stopReading(); show("story"); };
+  $("lRestart").onclick = () => { Speaker.play(0); $("read").scrollTo({ top: 0, behavior: "smooth" }); };
+  $("lPlay").onclick = () => Speaker.toggle();
+  $("rText").addEventListener("click", e => { const t = e.target.closest(".snt"); if (t && $("read").classList.contains("listen")) Speaker.play(+t.dataset.s); });
+  $("quitRead").onclick = () => { stopReading(); t0 = 0; show("story"); };
+  $("doneRead").onclick = () => {
+    const ms = performance.now() - t0;
+    stopReading();
+    // A tap on "done" right after starting is almost always a slip, so it isn't saved
+    if (ms < 15000) {
+      $("fTitle").textContent = cur.title; $("fTime").textContent = fmt(ms);
+      $("fCmp").innerHTML = `<span class="down">That was too quick to be the whole story, so it wasn't saved.</span><br>Tap <b>Read it again</b> and read every word aloud.`;
+      show("finish"); return;
+    }
+    const prev = readsOf(cur.id), last = prev[prev.length - 1], bestBefore = best(cur.id);
+    R.push({ s: cur.id, ms: Math.round(ms), at: new Date().toISOString() });
+    saveU("reads", R);
+    $("fTitle").textContent = cur.title;
+    $("fTime").textContent = fmt(ms);
+    let c = `${wpm(cur, ms)} words per minute`;
+    if (bestBefore && ms < bestBefore) c += `<br><span class="up">New best! ${((bestBefore - ms) / 1000).toFixed(1)} seconds faster than before.</span>`;
+    else if (last) {
+      const d = (last.ms - ms) / 1000;
+      c += `<br>` + (d >= 0 ? `<span class="up">${d.toFixed(1)} seconds faster than last time.</span>` : `<span class="down">${(-d).toFixed(1)} seconds slower than last time. Smooth reading counts more than speed.</span>`);
+    } else c += `<br>That's your first time on this story. Read it again another day to beat it.`;
+    $("fCmp").innerHTML = c;
+    show("finish");
+  };
+  $("fQs").onclick = () => openQs("story");
+  // Keyboard: Escape leaves reading without saving
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("read").hidden) $("quitRead").click(); });
+
+  // ---- Read-aloud ---------------------------------------------------------------------------------
+  // Uses the voices built into the device (Web Speech). The story is spoken one sentence at a time so
+  // each sentence can get its own tone: a little brighter for "!", a lift for "?", a touch more
+  // character for quoted speech, and a short breath between sentences and a longer one between paragraphs.
+  // Each word lights up blue as it's spoken.
+  const synth = window.speechSynthesis;
+  const RATES = [["Slower", 0.8], ["Normal", 0.95], ["Faster", 1.1]];
+  // Voices that sound most natural, best first. Whatever the device has gets ranked by this list.
+  const GOOD = ["Ava", "Samantha", "Allison", "Susan", "Zoe", "Evan", "Nathan", "Tom", "Joelle", "Noelle", "Aaron", "Nicky",
+    "Aria", "Jenny", "Guy", "Ana", "Christopher", "Eric", "Michelle", "Emma", "Brian", "Libby", "Sonia", "Ryan", "Natasha", "William",
+    "Google US English", "Google UK English Female", "Google UK English Male", "Karen", "Daniel", "Moira", "Tessa", "Serena", "Kate", "Alex"];
+  let voices = [], showAll = false;
+  function rankVoice(v) {
+    let r = GOOD.findIndex(n => v.name.includes(n)); if (r < 0) r = 100;
+    if (/Natural|Enhanced|Premium|Neural/i.test(v.name)) r -= 50;
+    if (/Novelty|Bad News|Bells|Boing|Bubbles|Cellos|Wobble|Zarvox|Trinoids|Whisper|Jester|Organ|Superstar|Albert|Fred|Junior|Ralph|Kathy|Grandma|Grandpa|Eddy|Flo|Reed|Rocko|Sandy|Shelley/i.test(v.name)) r += 500;
+    if (/^en[-_]US/i.test(v.lang)) r -= 3;
+    return r;
+  }
+  function loadVoices() {
+    if (!synth) return;
+    voices = synth.getVoices().filter(v => /^en([-_]|$)/i.test(v.lang)).sort((a, b) => rankVoice(a) - rankVoice(b));
+    if (!$("story").hidden) drawVoices();
+  }
+  if (synth) { loadVoices(); synth.addEventListener ? synth.addEventListener("voiceschanged", loadVoices) : (synth.onvoiceschanged = loadVoices); }
+  const REGION = { US: "US", GB: "British", AU: "Australian", IE: "Irish", ZA: "South African", IN: "Indian", CA: "Canadian", NZ: "New Zealand" };
+  function voiceLabel(v) {
+    let n = v.name.replace(/^(Microsoft|Google|Apple)\s+/i, "").replace(/\s*Online\s*/i, " ").replace(/\s*\((Natural|Enhanced|Premium)\)/i, "").replace(/\s*-\s*English.*$/i, "").replace(/\s+/g, " ").trim();
+    const reg = REGION[(v.lang.split(/[-_]/)[1] || "").toUpperCase()];
+    if (reg && !n.includes(reg) && !/English/.test(n)) n += ` (${reg})`;
+    return n;
+  }
+  const curVoice = () => voices.find(v => v.voiceURI === S.voice) || voices[0] || null;
+  function drawVoices() {
+    if (!synth || !voices.length) {
+      $("voiceChips").innerHTML = ""; $("moreVoices").textContent = "";
+      $("voiceHint").textContent = synth ? "Loading voices…" : "This browser can't read aloud. Try Safari or Chrome.";
+      $("listenBtn").disabled = !synth; $("rateRow").hidden = true;
+      return;
+    }
+    $("listenBtn").disabled = false; $("rateRow").hidden = false;
+    const v0 = curVoice(), list = showAll ? voices : voices.slice(0, 4);
+    if (v0 && !list.includes(v0)) list.push(v0);
+    $("voiceChips").innerHTML = list.map(v => `<button class="chip" data-voice="${esc(v.voiceURI)}" aria-pressed="${v === v0}">${esc(voiceLabel(v))}</button>`).join("");
+    $("moreVoices").textContent = voices.length > 4 ? (showAll ? "Fewer voices" : `More voices (${voices.length})`) : "";
+    $("voiceHint").textContent = "Tap a voice to hear it.";
+    $("rateChips").innerHTML = RATES.map(([n, r]) => `<button class="chip" data-rate="${r}" aria-pressed="${(S.rate || 0.95) === r}">${n}</button>`).join("");
+  }
+  $("moreVoices").onclick = () => { showAll = !showAll; drawVoices(); };
+  $("voiceChips").addEventListener("click", e => {
+    const b = e.target.closest("[data-voice]"); if (!b) return;
+    S.voice = b.dataset.voice; saveU("settings", S); drawVoices();
+    Speaker.sample(`Hi ${userName() || "there"}! Are you ready for a story? Let's read "${cur.title}" together.`);
+  });
+  $("rateChips").addEventListener("click", e => {
+    const b = e.target.closest("[data-rate]"); if (!b) return;
+    S.rate = +b.dataset.rate; saveU("settings", S); drawVoices();
+    Speaker.sample("This is how fast I'll read the story.");
+  });
+
+  const Speaker = (function () {
+    let sents = [], words = [], k = 0, playing = false, token = 0, gapTimer = 0, estTimers = [], lit = null;
+    // Split the story into sentences and words, and wrap each word in a span so it can light up
+    function render(s) {
+      sents = []; words = [];
+      return paras(s).map((p, pi) => {
+        const parts = p.match(/[^.!?]+(?:[.!?]+["”'’)]*)+\s*|[^.!?]+$/g) || [p];
+        return "<p>" + parts.map(t => {
+          const text = t.trim(); if (!text) return "";
+          const sk = sents.length, ws = [];
+          const html = text.replace(/\S+/g, (w, at) => { const wi = words.length; words.push(w); ws.push({ at, end: at + w.length, wi }); return `<span class="w" data-w="${wi}">${esc(w)}</span>`; });
+          const last = parts[parts.length - 1].trim() === text;
+          sents.push({ text, ws, para: pi, endPara: last });
+          return `<span class="snt" data-s="${sk}">${html}</span> `;
+        }).join("") + "</p>";
+      }).join("");
+    }
+    function light(wi) {
+      if (lit) lit.classList.remove("on");
+      lit = wi == null ? null : $("rText").querySelector(`[data-w="${wi}"]`);
+      if (!lit) return;
+      lit.classList.add("on");
+      const r = lit.getBoundingClientRect(), H = window.innerHeight;
+      if (r.top < 40 || r.bottom > H - 120) lit.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+    // Tone for each sentence: excitement on "!", a lift on "?", a bit more character inside quotes
+    function tone(t) {
+      const base = S.rate || 0.95;
+      let rate = base, pitch = 1;
+      if (/!["”'’)]*$/.test(t)) { pitch = 1.15; rate = base * 1.06; }
+      else if (/\?["”'’)]*$/.test(t)) { pitch = 1.08; }
+      if (/^["“]/.test(t)) pitch += 0.05;
+      if (/\b[A-Z]{3,}\b/.test(t)) { pitch += 0.05; }                 // BANG!
+      if (t.length > 160) rate = base * 1.03;                         // long run-on sentences flow a little faster
+      return { rate: Math.min(rate, 1.6), pitch: Math.min(pitch, 1.4) };
+    }
+    // After the sentence: a breath. Longer after a paragraph, a beat longer after "!" or "?"
+    function gapAfter(sn) { const r = S.rate || 0.95; return (sn.endPara ? 650 : /[!?]["”'’)]*$/.test(sn.text) ? 380 : 260) / r; }
+    // Some voices (mostly Google's online voices in Chrome) don't say which word they're on.
+    // Then we pace the highlight ourselves from word lengths and punctuation.
+    function estimate(sn, rate, my) {
+      let t = 0; const per = 60000 / (175 * rate);
+      sn.ws.forEach(w => {
+        estTimers.push(setTimeout(() => { if (my === token) light(w.wi); }, t));
+        const word = words[w.wi], len = word.replace(/[^A-Za-z0-9]/g, "").length;
+        t += per * (0.55 + 0.45 * Math.min(len, 12) / 5) + (/[,;:—-]["”'’)]*$/.test(word) ? 180 / rate : 0);
+      });
+    }
+    function clearTimers() { clearTimeout(gapTimer); estTimers.forEach(clearTimeout); estTimers = []; }
+    function say(i) {
+      clearTimers();
+      if (i >= sents.length) { finish(); return; }
+      k = i; const sn = sents[i], my = ++token, v = curVoice(), tn = tone(sn.text);
+      const u = new SpeechSynthesisUtterance(sn.text.replace(/[“”]/g, '"'));
+      if (v) { u.voice = v; u.lang = v.lang; }
+      u.rate = tn.rate; u.pitch = tn.pitch;
+      let gotBoundary = false;
+      u.onstart = () => { if (my !== token) return; light(sn.ws[0] && sn.ws[0].wi); estTimers.push(setTimeout(() => { if (my === token && !gotBoundary) estimate(sn, tn.rate, my); }, 450)); };
+      u.onboundary = e => {
+        if (my !== token || (e.name && e.name !== "word")) return;
+        if (!gotBoundary) { gotBoundary = true; estTimers.forEach(clearTimeout); estTimers = []; }
+        const w = sn.ws.find(w => e.charIndex >= w.at && e.charIndex < w.end) || sn.ws.find(w => w.at >= e.charIndex);
+        if (w) light(w.wi);
+      };
+      u.onend = () => { if (my !== token || !playing) return; clearTimers(); gapTimer = setTimeout(() => { if (my === token && playing) say(i + 1); }, gapAfter(sn)); };
+      u.onerror = e => { if (my !== token || e.error === "interrupted" || e.error === "canceled") return; u.onend(); };
+      synth.speak(u);
+    }
+    function setBtn() { $("lPlay").textContent = playing ? "Pause" : (k >= sents.length ? "Play again" : "Play"); }
+    function finish() { playing = false; light(null); k = sents.length; setBtn(); }
+    function stop() { token++; playing = false; clearTimers(); if (synth) synth.cancel(); light(null); }
+    // Pause stops at the current sentence and Play picks it back up from the start of that sentence,
+    // which works the same in every browser (speechSynthesis.pause is unreliable on some).
+    function play(i) { if (!synth) return; stop(); playing = true; setBtn(); say(i || 0); }
+    function toggle() {
+      if (playing) { stop(); playing = false; setBtn(); }
+      else play(k >= sents.length ? 0 : k);
+    }
+    function sample(text) {
+      if (!synth) return; synth.cancel();
+      const u = new SpeechSynthesisUtterance(text), v = curVoice();
+      if (v) { u.voice = v; u.lang = v.lang; } u.rate = S.rate || 0.95; synth.speak(u);
+    }
+    return { render, play, stop, toggle, sample };
+  })();
+
+  // ---- Questions ----------------------------------------------------------------------------------
+  let qsFrom = "story", savedTimer = 0;
+  function openQs(from) {
+    qsFrom = from;
+    const s = cur, a = A[s.id] = A[s.id] || {}, qs = questions(s);
+    $("qTitle").textContent = s.title;
+    $("lookback").innerHTML = `<h3 style="margin-bottom:10px">${esc(s.title)}</h3>` + paras(s).map(p => `<p>${esc(p)}</p>`).join("");
+    let html = "", sec = "";
+    qs.forEach(q => {
+      if (q.sec !== sec) { if (sec) html += `</div>`; sec = q.sec; html += `<div class="panel qsec"><h2>${esc(sec)}</h2>`; }
+      const head = `<div class="qt">${q.tag ? `<span class="tag">${esc(q.tag)}</span>` : ""}${q.n ? `<span class="num">${q.n}.</span>` : ""}${esc(q.q)}</div>`;
+      const v = a[q.id];
+      let body;
+      if (q.kind === "list3") {
+        const arr = Array.isArray(v) ? v : ["", "", ""];
+        body = `<div class="l3">${[0, 1, 2].map(i => `<label>${i + 1}.<input type="text" data-q="${q.id}" data-i="${i}" value="${esc(arr[i] || "")}"></label>`).join("")}</div>`;
+      } else if (q.kind === "draw") {
+        body = `<div class="drawbar"><button class="pen" data-c="#222" aria-pressed="true" style="background:#222"></button><button class="pen" data-c="#d33" style="background:#d33"></button><button class="pen" data-c="#2a7" style="background:#2a7"></button><button class="pen" data-c="#27c" style="background:#27c"></button><button class="pen" data-c="#e90" style="background:#e90"></button><button class="pen" data-c="#8b5a2b" style="background:#8b5a2b"></button><span class="grow"></span><button class="btn" data-clear="${q.id}">Clear</button></div>
+          <div class="drawbox"><canvas data-draw="${q.id}"></canvas></div>`;
+      } else body = `<textarea data-q="${q.id}" rows="3" placeholder="Restate the question in your answer.">${esc(v || "")}</textarea>`;
+      html += `<div class="q${isAnswered(v) ? " done" : ""}" data-qid="${q.id}">${head}${body}</div>`;
+    });
+    $("qList").innerHTML = html + `</div>`;
+    $("qList").querySelectorAll("canvas[data-draw]").forEach(setupDraw);
+    $("qSaved").textContent = "";
+    countQs();
+    show("qs");
+  }
+  function countQs() {
+    const qs = questions(cur), n = answeredCount(cur);
+    $("qCount").textContent = `${n} of ${qs.length} answered`;
+    $("qBar").style.width = (qs.length ? n / qs.length * 100 : 0) + "%";
+  }
+  function saveAnswers(qid) {
+    saveU("answers", A);
+    const el = $("qList").querySelector(`[data-qid="${qid}"]`);
+    if (el) el.classList.toggle("done", isAnswered(A[cur.id][qid]));
+    countQs();
+    $("qSaved").textContent = "Saving…";
+    clearTimeout(savedTimer); savedTimer = setTimeout(() => $("qSaved").textContent = "Saved", 400);
+  }
+  $("qList").addEventListener("input", e => {
+    const t = e.target, qid = t.dataset.q; if (!qid) return;
+    const a = A[cur.id];
+    if (t.dataset.i != null) { const arr = Array.isArray(a[qid]) ? a[qid] : ["", "", ""]; arr[+t.dataset.i] = t.value; a[qid] = arr; }
+    else a[qid] = t.value;
+    saveAnswers(qid);
+  });
+  $("lookBtn").onclick = () => {
+    const lb = $("lookback"); lb.hidden = !lb.hidden;
+    $("lookBtn").textContent = lb.hidden ? "Show the story" : "Hide the story";
+    document.body.classList.toggle("wide", !lb.hidden);
+    if (!lb.hidden && window.innerWidth < 1100) lb.scrollIntoView({ behavior: "smooth" });
+  };
+  $("qsBack").onclick = () => show(qsFrom === "story" ? "story" : "home");
+  $("qDone").onclick = () => show("story");
+
+  // Drawing box for "Visualizing" questions. The picture is kept as an image with the answers.
+  function setupDraw(cv) {
+    const qid = cv.dataset.draw, box = cv.closest(".q"), ctx = cv.getContext("2d");
+    let color = "#222", drawing = false, last = null;
+    const ratio = window.devicePixelRatio || 1;
+    function size() {
+      const r = cv.getBoundingClientRect();
+      cv.width = r.width * ratio; cv.height = r.height * ratio;
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      const src = A[cur.id][qid];
+      if (src) { const img = new Image(); img.onload = () => ctx.drawImage(img, 0, 0, r.width, r.height); img.src = src; }
+    }
+    requestAnimationFrame(size);
+    const pos = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    cv.addEventListener("pointerdown", e => { drawing = true; last = pos(e); cv.setPointerCapture(e.pointerId); dot(last); });
+    cv.addEventListener("pointermove", e => {
+      if (!drawing) return;
+      const p = pos(e), w = e.pressure && e.pointerType === "pen" ? 1.5 + e.pressure * 4 : 3;
+      ctx.strokeStyle = color; ctx.lineWidth = w; ctx.lineCap = ctx.lineJoin = "round";
+      ctx.beginPath(); ctx.moveTo(...last); ctx.lineTo(...p); ctx.stroke(); last = p;
+    });
+    const end = () => { if (!drawing) return; drawing = false; A[cur.id][qid] = cv.toDataURL("image/png"); saveAnswers(qid); };
+    cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+    function dot(p) { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(p[0], p[1], 1.5, 0, 7); ctx.fill(); }
+    box.querySelectorAll(".pen").forEach(b => b.onclick = () => { color = b.dataset.c; box.querySelectorAll(".pen").forEach(x => x.setAttribute("aria-pressed", x === b)); });
+    box.querySelector("[data-clear]").onclick = () => { ctx.clearRect(0, 0, cv.width, cv.height); delete A[cur.id][qid]; saveAnswers(qid); };
+  }
+
+  // ---- Progress -----------------------------------------------------------------------------------
+  function drawProgress() {
+    $("pTitle").textContent = `${userName()}'s progress`;
+    const total = R.reduce((a, r) => a + r.ms, 0), days = new Set(R.map(r => dayKey(r.at)));
+    let streak = 0; const d = new Date();
+    if (!days.has(dayKey(d))) d.setDate(d.getDate() - 1);  // today not read yet doesn't break the streak
+    while (days.has(dayKey(d))) { streak++; d.setDate(d.getDate() - 1); }
+    const all = allStories(), qTot = all.reduce((a, s) => a + questions(s).length, 0), qDone = all.reduce((a, s) => a + answeredCount(s), 0);
+    const recent = R.slice(-5).map(r => story(r.s) && wpm(story(r.s), r.ms)).filter(Boolean);
+    $("pStats").innerHTML = [
+      [R.length, "timed reads"], [days.size, "days of reading"], [streak, "day streak"],
+      [fmtShort(total), "minutes reading aloud"], [recent.length ? Math.round(recent.reduce((a, b) => a + b, 0) / recent.length) : "–", "words / min lately"],
+      [`${qDone}/${qTot}`, "questions answered"]
+    ].map(([n, k]) => `<div><div class="n">${n}</div><div class="k">${k}</div></div>`).join("");
+    drawWeek($("pWeek"), R, true);
+    const pts = R.filter(r => story(r.s)).map(r => ({ v: wpm(story(r.s), r.ms), label: new Date(r.at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) }));
+    $("pChart").innerHTML = pts.length ? barChart(pts, v => v, false) : `<p class="hint" style="margin:0">No timed reads yet. Pick a story and tap Start reading.</p>`;
+    $("pTable").innerHTML = `<tr><th>Story</th><th>Reads</th><th>Best</th><th>Latest</th><th>Questions</th></tr>` + all.map(s => {
+      const r = readsOf(s.id), b = best(s.id);
+      return `<tr data-sid="${s.id}" style="cursor:pointer"><td>${esc(s.title)}</td><td>${r.length}</td><td class="mono">${b ? fmt(b) : "–"}</td><td class="mono">${r.length ? fmt(r[r.length - 1].ms) : "–"}</td><td>${answeredCount(s)}/${questions(s).length}</td></tr>`;
+    }).join("");
+  }
+  $("pTable").addEventListener("click", e => { const t = e.target.closest("[data-sid]"); if (t) { cur = story(t.dataset.sid); show("story"); } });
+
+  // ---- Player dialog ------------------------------------------------------------------------------
+  let editing = null;
+  function openUser(u) {
+    editing = u;
+    $("userDlgT").textContent = u ? "Rename player" : "New player";
+    $("userName").value = u ? u.name : "";
+    $("userDel").hidden = !u || users.length < 2;
+    $("userDlg").showModal(); $("userName").focus();
+  }
+  $("editUser").onclick = () => openUser(users.find(u => u.id === uid));
+  $("userCancel").onclick = () => $("userDlg").close();
+  $("userSave").onclick = () => {
+    const name = $("userName").value.trim(); if (!name) return;
+    if (editing) editing.name = name;
+    else { const id = "u" + Date.now().toString(36); users.push({ id, name }); loadUser(id); }
+    save("users", users); $("userDlg").close(); drawHome();
+  };
+  $("userDel").onclick = () => {
+    if (!confirm(`Remove ${editing.name} and all of their reading times and answers?`)) return;
+    users = users.filter(u => u !== editing); save("users", users);
+    ["settings", "reads", "answers"].forEach(k => localStorage.removeItem(KEY + ":" + k + ":" + editing.id));
+    loadUser(users[0].id); $("userDlg").close(); drawHome();
+  };
+
+  // ---- Add / edit a story -------------------------------------------------------------------------
+  let editStory = null;
+  function openStory(s) {
+    editStory = s;
+    $("storyDlgT").textContent = s ? "Edit story" : "Add a story";
+    $("nsTitle").value = s ? s.title : "";
+    $("nsText").value = s ? s.text : "";
+    $("nsQs").value = s ? s.sections.map(sec => (sec.name !== "Questions" ? sec.name + ":\n" : "") + sec.qs.join("\n")).join("\n") : "";
+    $("nsDel").hidden = !s;
+    $("storyDlg").showModal();
+  }
+  $("addStoryBtn").onclick = () => openStory(null);
+  $("editStoryBtn").onclick = () => openStory(cur);
+  $("nsCancel").onclick = () => $("storyDlg").close();
+  $("nsSave").onclick = () => {
+    const title = $("nsTitle").value.trim(), text = $("nsText").value.trim();
+    if (!title || !text) { alert("Add a title and the story text."); return; }
+    const sections = [];
+    $("nsQs").value.split("\n").map(l => l.trim()).filter(Boolean).forEach(l => {
+      if (/:$/.test(l) && !/\?/.test(l)) sections.push({ name: l.slice(0, -1).trim(), qs: [] });
+      else { if (!sections.length) sections.push({ name: "Questions", qs: [] }); sections[sections.length - 1].qs.push(l.replace(/^\d+[.)]\s*/, "")); }
+    });
+    const data = { title, text, sections: sections.filter(s => s.qs.length), custom: true };
+    if (editStory) Object.assign(editStory, data);
+    else { const s = Object.assign({ id: "c" + Date.now().toString(36) }, data); custom.push(s); cur = s; }
+    save("custom", custom); $("storyDlg").close();
+    show("story");
+  };
+  $("nsDel").onclick = () => {
+    if (!confirm(`Delete "${editStory.title}"? Reading times for it are kept but the story is removed for everyone.`)) return;
+    custom = custom.filter(s => s !== editStory); save("custom", custom); $("storyDlg").close(); show("home");
+  };
+
+  show("home");
+})();
+</script>
+</body>
+</html>

@@ -113,9 +113,19 @@ table.log td.mono { white-space: nowrap; }
 #flow .fword { display: grid; grid-template-columns: 1fr auto 1fr; align-items: baseline; font: 500 64px/1.25 var(--f-read); white-space: pre; }
 #flow .fword .L { text-align: right; } #flow .fword .P { color: #ff4b4b; }
 #flow .fhint { text-align: center; color: #6a6a72; font-size: 15px; margin-top: 18px; min-height: 22px; }
-#flow .fctx { position: absolute; left: 6%; right: 6%; bottom: 18px; text-align: center; color: #8a8a8a; font: 400 18px/1.6 var(--f-read); }
-#flow .fctx span { cursor: pointer; } #flow .fctx .cur { color: #fff; text-decoration: underline; text-decoration-color: #ff4b4b; text-underline-offset: 4px; }
+/* Below the word: the current sentence, or the whole story with your place marked */
+#flow .fsec { padding: 0 6% 10px; display: grid; gap: 8px; justify-items: center; }
+#flow .ftog { background: none; border: 1px solid #2c2c2c; color: #9a9a9a; border-radius: 999px; padding: 6px 16px; font: 500 14px var(--f-body); cursor: pointer; }
+#flow .ftog:hover { color: #fff; border-color: #555; }
+#flow .fctx { text-align: center; color: #8a8a8a; font: 400 18px/1.6 var(--f-read); min-height: 1.6em; }
+#flow .fctx span, #flow .fall span { cursor: pointer; }
+#flow .fctx .cur, #flow .fall .cur { color: #fff; text-decoration: underline; text-decoration-color: #ff4b4b; text-decoration-thickness: 2px; text-underline-offset: 5px; }
 #flow.playing .fctx, #flow.playing .fhint { visibility: hidden; }
+#flow .fall { width: min(100%, 46em); max-height: 38vh; overflow-y: auto; text-align: left; background: #0d0d0d; border: 1px solid #222; border-radius: 12px; padding: 14px 18px; -webkit-overflow-scrolling: touch; }
+#flow .fall p { margin: 0 0 .8em; font: 400 18px/1.75 var(--f-read); color: #a8a8a8; }
+#flow .fall .done { color: #5a5a5a; }
+#flow .fall .sent { color: #e6e6e6; }
+#flow.whole .fctx { display: none; }
 #flow .fbar { height: 4px; background: #1c1c1c; } #flow .fbar i { display: block; height: 100%; width: 0; background: #4a9fd0; transition: width .12s linear; }
 #flow .fctl { display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px 12px max(14px, env(safe-area-inset-bottom)); }
 #flow .fctl .ib { width: 58px; height: 50px; border-radius: 14px; border: 0; background: #2b6fd6; color: #fff; font-size: 20px; cursor: pointer; }
@@ -308,7 +318,11 @@ dialog textarea { min-height: 120px; font-size: 15px; }
     <div class="fword" id="fWord"><span class="L"></span><span class="P"></span><span class="R"></span></div>
     <div class="fguide bottom"></div>
     <div class="fhint" id="fHint"></div>
+  </div>
+  <div class="fsec">
     <div class="fctx" id="fCtx"></div>
+    <button class="ftog" id="fTog">▾ Show the whole story</button>
+    <div class="fall" id="fAll" hidden></div>
   </div>
   <div class="fbar"><i id="fBar"></i></div>
   <div class="fctl">
@@ -801,12 +815,12 @@ dialog textarea { min-height: 120px; font-size: 15px; }
     const wpm = () => S.flowWpm || 150;
     function tokens(s) {
       const out = [];
-      paras(s).forEach(p => {
+      paras(s).forEach((p, pi) => {
         const ws = p.split(/\s+/).filter(Boolean);
         ws.forEach((w, i) => {
           let pause = /[.!?…]["'”’)\]]*$/.test(w) ? 2 : /[,;:—–]["'”’)\]]*$/.test(w) ? 1 : 0;
           if (i === ws.length - 1) pause = 3;
-          out.push({ w, pause });
+          out.push({ w, pause, pi });
         });
       });
       return out;
@@ -840,17 +854,45 @@ dialog textarea { min-height: 120px; font-size: 15px; }
     }
     function bar() { $("fBar").style.width = (toks.length ? (done ? 100 : pos / (toks.length - 1) * 100) : 0) + "%"; }
     function label() { $("fWpm").textContent = `${wpm()} words / min`; $("fSpd").textContent = wpm(); }
+    const sentStart = p => { while (p > 0 && toks[p - 1].pause < 2) p--; return p; };
+    const sentEnd = p => { while (p < toks.length - 1 && toks[p].pause < 2) p++; return p; };
+    // The whole story, with words already read dimmed, the current sentence bright and the current word underlined
+    const whole = () => !!S.flowWhole;
+    function drawAll() {
+      let html = "", pi = -1;
+      toks.forEach((t, i) => { if (t.pi !== pi) { html += (pi < 0 ? "" : "</p>") + "<p>"; pi = t.pi; } html += `<span data-p="${i}">${esc(t.w)}</span> `; });
+      $("fAll").innerHTML = html + "</p>";
+      spans = [...$("fAll").querySelectorAll("[data-p]")];
+    }
+    let spans = [];
+    function mark(scroll) {
+      if (!whole() || !spans.length) return;
+      const a = sentStart(pos), b = sentEnd(pos), at = done ? toks.length : pos;
+      spans.forEach((el, i) => { el.className = i === pos && !done ? "cur" : i >= a && i <= b && !done ? "sent" : i < at ? "done" : ""; });
+      const el = spans[pos], box = $("fAll");
+      if (el && scroll !== false) {
+        const top = el.offsetTop - box.offsetTop, h = box.clientHeight;
+        if (top < box.scrollTop + 10 || top > box.scrollTop + h - 40) box.scrollTop = Math.max(0, top - h / 3);
+      }
+    }
+    function setWhole(on) {
+      S.flowWhole = on; saveU("settings", S);
+      $("flow").classList.toggle("whole", on); $("fAll").hidden = !on;
+      $("fTog").textContent = on ? "▴ Hide the whole story" : "▾ Show the whole story";
+      if (on) { if (!spans.length) drawAll(); mark(); }
+      if (toks[pos]) show(toks[pos]);
+    }
     function context() {
+      mark();
       if (playing || done) { $("fCtx").innerHTML = ""; return; }
-      let a = pos; while (a > 0 && toks[a - 1].pause < 2) a--;
-      let b = pos; while (b < toks.length - 1 && toks[b].pause < 2) b++;
+      const a = sentStart(pos), b = sentEnd(pos);
       $("fCtx").innerHTML = toks.slice(a, b + 1).map((t, j) => `<span data-p="${a + j}"${a + j === pos ? ' class="cur"' : ""}>${esc(t.w)}</span>`).join(" ");
       $("fHint").textContent = pos === 0 ? "Tap the word or ▶ to start" : "Paused. Tap a word below to start from there";
     }
     function step() {
       if (!playing) return;
       if (pos >= toks.length) { finish(); return; }
-      show(toks[pos]); bar();
+      show(toks[pos]); bar(); mark();
       timer = setTimeout(() => { pos++; step(); }, time(toks[pos]));
     }
     function play() { if (playing) return; if (done) { done = false; pos = 0; $("fDone").hidden = true; } playing = true; ramp = 0; $("flow").classList.add("playing"); $("fPlay").textContent = "❚❚"; context(); step(); }
@@ -867,14 +909,18 @@ dialog textarea { min-height: 120px; font-size: 15px; }
       $("fDone").hidden = false; $("fCtx").innerHTML = "";
     }
     function open() {
-      toks = tokens(cur); pos = 0; done = false; playing = false;
+      toks = tokens(cur); pos = 0; done = false; playing = false; spans = []; $("fAll").innerHTML = "";
       $("fDone").hidden = true; $("flow").hidden = false; document.body.classList.add("reading");
       $("flow").classList.remove("playing"); $("fPlay").textContent = "▶";
-      label(); requestAnimationFrame(() => { show(toks[0]); bar(); context(); });
+      label(); setWhole(whole()); requestAnimationFrame(() => { show(toks[0]); bar(); context(); });
     }
     function close() { pause(); $("flow").hidden = true; document.body.classList.remove("reading"); }
     $("fStage").addEventListener("click", e => { const sp = e.target.closest("[data-p]"); if (sp) { seek(+sp.dataset.p); play(); return; } playing ? pause() : play(); });
     $("fPlay").onclick = () => playing ? pause() : play();
+    $("fTog").onclick = () => setWhole(!whole());
+    // Tap a word in the sentence or the whole story to start reading from there
+    const jump = e => { const sp = e.target.closest("[data-p]"); if (sp) { seek(+sp.dataset.p); play(); } };
+    $("fCtx").addEventListener("click", jump); $("fAll").addEventListener("click", jump);
     $("fPrev").onclick = prev; $("fNext").onclick = next;
     $("fSlow").onclick = () => speed(-25); $("fFast").onclick = () => speed(25);
     $("fBack").onclick = $("fDoneBack").onclick = () => { close(); show_("story"); };

@@ -99,6 +99,12 @@ table.log td.mono { white-space: nowrap; }
 #read .quit { position: fixed; top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); background: none; border: 0; color: #fff; opacity: .12; font-size: 22px; width: 44px; height: 44px; cursor: pointer; }
 #read .quit:hover, #read .quit:focus-visible { opacity: .6; }
 body.reading { overflow: hidden; }
+/* Read-aloud: each word lights up blue as it's spoken */
+#read .w { border-radius: 5px; transition: background-color .12s, color .12s; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+#read .w.on { color: #fff; background: #2f86c4; box-shadow: 0 0 0 3px #2f86c4; }
+#read.listen .snt { cursor: pointer; }
+#read .lbar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 10px; padding: 12px 12px max(12px, env(safe-area-inset-bottom)); background: linear-gradient(transparent, #151617 35%); }
+#read .lbar .play { padding: 12px 34px; min-width: 130px; }
 
 /* Finish card */
 .big { font: 600 clamp(44px, 12vw, 64px) var(--f-mono); color: var(--good); letter-spacing: -0.02em; }
@@ -175,11 +181,22 @@ dialog textarea { min-height: 120px; font-size: 15px; }
       <p style="margin:0;font-size:16px"><b>Read the entire passage aloud.</b> When you finish, tap <i>I'm done reading</i> and your time is saved for today.</p>
       <div class="acts">
         <button class="play" id="startBtn">Start reading</button>
+        <button class="btn" id="listenBtn">🔊 Listen to the story</button>
         <button class="btn" id="toQsBtn">Questions</button>
       </div>
+      <p class="hint" style="margin:-4px 0 0">Listening isn't timed. Only <i>Start reading</i> saves a time.</p>
       <div class="row">
         <span class="label">Text size</span>
         <div class="chips sizes" id="sizeChips"></div>
+      </div>
+      <div class="row" id="voiceRow">
+        <span class="label">Read-aloud voice <a id="moreVoices"></a></span>
+        <div class="chips" id="voiceChips"></div>
+        <span class="hint" id="voiceHint"></span>
+      </div>
+      <div class="row" id="rateRow">
+        <span class="label">Read-aloud speed</span>
+        <div class="chips" id="rateChips"></div>
       </div>
     </div>
     <div class="panel">
@@ -245,6 +262,12 @@ dialog textarea { min-height: 120px; font-size: 15px; }
     <h1 id="rTitle"></h1>
     <div class="txt" id="rText"></div>
     <button class="doneRead" id="doneRead">I'm done reading</button>
+    <div style="height:90px" id="lpad" hidden></div>
+  </div>
+  <div class="lbar" id="lbar" hidden>
+    <button class="btn" id="lRestart" aria-label="Start over">↺ Start over</button>
+    <button class="play" id="lPlay">Pause</button>
+    <button class="btn" id="lDone">Done</button>
   </div>
 </div>
 
@@ -388,6 +411,7 @@ dialog textarea { min-height: 120px; font-size: 15px; }
       $("sLog").innerHTML = `<tr><th>Day</th><th>Time</th><th>Words / min</th><th></th></tr>` + reads.slice().reverse().map(r =>
         `<tr><td>${new Date(r.at).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</td><td class="mono">${fmt(r.ms)}</td><td class="mono">${wpm(s, r.ms)}</td><td style="text-align:right"><button class="back" data-del="${r.at}" title="Delete this time" style="color:var(--muted)">×</button></td></tr>`).join("");
     }
+    drawVoices();
     $("pinBtn").textContent = S.current === s.id ? "Unmark as this week's story" : "Mark as this week's story";
   }
   $("sizeChips").addEventListener("click", e => { const b = e.target.closest("[data-size]"); if (!b) return; S.size = +b.dataset.size; saveU("settings", S); drawStory(); });
@@ -429,11 +453,14 @@ dialog textarea { min-height: 120px; font-size: 15px; }
 
   // ---- Focus reading: the timer runs, but nothing about it is on screen ---------------------------
   let t0 = 0, wake = null;
-  function startReading() {
+  function startReading(listen) {
     const s = cur;
+    listen = listen === true;
     document.documentElement.style.setProperty("--read-size", S.size + "px");
     $("rTitle").textContent = s.title;
-    $("rText").innerHTML = paras(s).map(p => `<p>${esc(p)}</p>`).join("");
+    $("rText").innerHTML = listen ? Speaker.render(s) : paras(s).map(p => `<p>${esc(p)}</p>`).join("");
+    $("read").classList.toggle("listen", listen);
+    $("doneRead").hidden = listen; $("lbar").hidden = !listen; $("lpad").hidden = !listen;
     $("read").hidden = false; $("read").scrollTop = 0;
     document.body.classList.add("reading");
     const el = document.documentElement;
@@ -442,13 +469,19 @@ dialog textarea { min-height: 120px; font-size: 15px; }
     t0 = performance.now();
   }
   function stopReading() {
+    Speaker.stop();
     $("read").hidden = true;
     document.body.classList.remove("reading");
     try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
     try { if (wake) wake.release(); } catch (e) {} wake = null;
   }
-  $("startBtn").onclick = startReading;
-  $("fAgain").onclick = startReading;
+  $("startBtn").onclick = () => startReading(false);
+  $("fAgain").onclick = () => startReading(false);
+  $("listenBtn").onclick = () => { startReading(true); t0 = 0; Speaker.play(0); };
+  $("lDone").onclick = () => { stopReading(); show("story"); };
+  $("lRestart").onclick = () => { Speaker.play(0); $("read").scrollTo({ top: 0, behavior: "smooth" }); };
+  $("lPlay").onclick = () => Speaker.toggle();
+  $("rText").addEventListener("click", e => { const t = e.target.closest(".snt"); if (t && $("read").classList.contains("listen")) Speaker.play(+t.dataset.s); });
   $("quitRead").onclick = () => { stopReading(); t0 = 0; show("story"); };
   $("doneRead").onclick = () => {
     const ms = performance.now() - t0;
@@ -476,6 +509,152 @@ dialog textarea { min-height: 120px; font-size: 15px; }
   $("fQs").onclick = () => openQs("story");
   // Keyboard: Escape leaves reading without saving
   document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("read").hidden) $("quitRead").click(); });
+
+  // ---- Read-aloud ---------------------------------------------------------------------------------
+  // Uses the voices built into the device (Web Speech). The story is spoken one sentence at a time so
+  // each sentence can get its own tone: a little brighter for "!", a lift for "?", a touch more
+  // character for quoted speech, and a short breath between sentences and a longer one between paragraphs.
+  // Each word lights up blue as it's spoken.
+  const synth = window.speechSynthesis;
+  const RATES = [["Slower", 0.8], ["Normal", 0.95], ["Faster", 1.1]];
+  // Voices that sound most natural, best first. Whatever the device has gets ranked by this list.
+  const GOOD = ["Ava", "Samantha", "Allison", "Susan", "Zoe", "Evan", "Nathan", "Tom", "Joelle", "Noelle", "Aaron", "Nicky",
+    "Aria", "Jenny", "Guy", "Ana", "Christopher", "Eric", "Michelle", "Emma", "Brian", "Libby", "Sonia", "Ryan", "Natasha", "William",
+    "Google US English", "Google UK English Female", "Google UK English Male", "Karen", "Daniel", "Moira", "Tessa", "Serena", "Kate", "Alex"];
+  let voices = [], showAll = false;
+  function rankVoice(v) {
+    let r = GOOD.findIndex(n => v.name.includes(n)); if (r < 0) r = 100;
+    if (/Natural|Enhanced|Premium|Neural/i.test(v.name)) r -= 50;
+    if (/Novelty|Bad News|Bells|Boing|Bubbles|Cellos|Wobble|Zarvox|Trinoids|Whisper|Jester|Organ|Superstar|Albert|Fred|Junior|Ralph|Kathy|Grandma|Grandpa|Eddy|Flo|Reed|Rocko|Sandy|Shelley/i.test(v.name)) r += 500;
+    if (/^en[-_]US/i.test(v.lang)) r -= 3;
+    return r;
+  }
+  function loadVoices() {
+    if (!synth) return;
+    voices = synth.getVoices().filter(v => /^en([-_]|$)/i.test(v.lang)).sort((a, b) => rankVoice(a) - rankVoice(b));
+    if (!$("story").hidden) drawVoices();
+  }
+  if (synth) { loadVoices(); synth.addEventListener ? synth.addEventListener("voiceschanged", loadVoices) : (synth.onvoiceschanged = loadVoices); }
+  const REGION = { US: "US", GB: "British", AU: "Australian", IE: "Irish", ZA: "South African", IN: "Indian", CA: "Canadian", NZ: "New Zealand" };
+  function voiceLabel(v) {
+    let n = v.name.replace(/^(Microsoft|Google|Apple)\s+/i, "").replace(/\s*Online\s*/i, " ").replace(/\s*\((Natural|Enhanced|Premium)\)/i, "").replace(/\s*-\s*English.*$/i, "").replace(/\s+/g, " ").trim();
+    const reg = REGION[(v.lang.split(/[-_]/)[1] || "").toUpperCase()];
+    if (reg && !n.includes(reg) && !/English/.test(n)) n += ` (${reg})`;
+    return n;
+  }
+  const curVoice = () => voices.find(v => v.voiceURI === S.voice) || voices[0] || null;
+  function drawVoices() {
+    if (!synth || !voices.length) {
+      $("voiceChips").innerHTML = ""; $("moreVoices").textContent = "";
+      $("voiceHint").textContent = synth ? "Loading voices…" : "This browser can't read aloud. Try Safari or Chrome.";
+      $("listenBtn").disabled = !synth; $("rateRow").hidden = true;
+      return;
+    }
+    $("listenBtn").disabled = false; $("rateRow").hidden = false;
+    const v0 = curVoice(), list = showAll ? voices : voices.slice(0, 4);
+    if (v0 && !list.includes(v0)) list.push(v0);
+    $("voiceChips").innerHTML = list.map(v => `<button class="chip" data-voice="${esc(v.voiceURI)}" aria-pressed="${v === v0}">${esc(voiceLabel(v))}</button>`).join("");
+    $("moreVoices").textContent = voices.length > 4 ? (showAll ? "Fewer voices" : `More voices (${voices.length})`) : "";
+    $("voiceHint").textContent = "Tap a voice to hear it.";
+    $("rateChips").innerHTML = RATES.map(([n, r]) => `<button class="chip" data-rate="${r}" aria-pressed="${(S.rate || 0.95) === r}">${n}</button>`).join("");
+  }
+  $("moreVoices").onclick = () => { showAll = !showAll; drawVoices(); };
+  $("voiceChips").addEventListener("click", e => {
+    const b = e.target.closest("[data-voice]"); if (!b) return;
+    S.voice = b.dataset.voice; saveU("settings", S); drawVoices();
+    Speaker.sample(`Hi ${userName() || "there"}! Are you ready for a story? Let's read "${cur.title}" together.`);
+  });
+  $("rateChips").addEventListener("click", e => {
+    const b = e.target.closest("[data-rate]"); if (!b) return;
+    S.rate = +b.dataset.rate; saveU("settings", S); drawVoices();
+    Speaker.sample("This is how fast I'll read the story.");
+  });
+
+  const Speaker = (function () {
+    let sents = [], words = [], k = 0, playing = false, token = 0, gapTimer = 0, estTimers = [], lit = null;
+    // Split the story into sentences and words, and wrap each word in a span so it can light up
+    function render(s) {
+      sents = []; words = [];
+      return paras(s).map((p, pi) => {
+        const parts = p.match(/[^.!?]+(?:[.!?]+["”'’)]*)+\s*|[^.!?]+$/g) || [p];
+        return "<p>" + parts.map(t => {
+          const text = t.trim(); if (!text) return "";
+          const sk = sents.length, ws = [];
+          const html = text.replace(/\S+/g, (w, at) => { const wi = words.length; words.push(w); ws.push({ at, end: at + w.length, wi }); return `<span class="w" data-w="${wi}">${esc(w)}</span>`; });
+          const last = parts[parts.length - 1].trim() === text;
+          sents.push({ text, ws, para: pi, endPara: last });
+          return `<span class="snt" data-s="${sk}">${html}</span> `;
+        }).join("") + "</p>";
+      }).join("");
+    }
+    function light(wi) {
+      if (lit) lit.classList.remove("on");
+      lit = wi == null ? null : $("rText").querySelector(`[data-w="${wi}"]`);
+      if (!lit) return;
+      lit.classList.add("on");
+      const r = lit.getBoundingClientRect(), H = window.innerHeight;
+      if (r.top < 40 || r.bottom > H - 120) lit.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+    // Tone for each sentence: excitement on "!", a lift on "?", a bit more character inside quotes
+    function tone(t) {
+      const base = S.rate || 0.95;
+      let rate = base, pitch = 1;
+      if (/!["”'’)]*$/.test(t)) { pitch = 1.15; rate = base * 1.06; }
+      else if (/\?["”'’)]*$/.test(t)) { pitch = 1.08; }
+      if (/^["“]/.test(t)) pitch += 0.05;
+      if (/\b[A-Z]{3,}\b/.test(t)) { pitch += 0.05; }                 // BANG!
+      if (t.length > 160) rate = base * 1.03;                         // long run-on sentences flow a little faster
+      return { rate: Math.min(rate, 1.6), pitch: Math.min(pitch, 1.4) };
+    }
+    // After the sentence: a breath. Longer after a paragraph, a beat longer after "!" or "?"
+    function gapAfter(sn) { const r = S.rate || 0.95; return (sn.endPara ? 650 : /[!?]["”'’)]*$/.test(sn.text) ? 380 : 260) / r; }
+    // Some voices (mostly Google's online voices in Chrome) don't say which word they're on.
+    // Then we pace the highlight ourselves from word lengths and punctuation.
+    function estimate(sn, rate, my) {
+      let t = 0; const per = 60000 / (175 * rate);
+      sn.ws.forEach(w => {
+        estTimers.push(setTimeout(() => { if (my === token) light(w.wi); }, t));
+        const word = words[w.wi], len = word.replace(/[^A-Za-z0-9]/g, "").length;
+        t += per * (0.55 + 0.45 * Math.min(len, 12) / 5) + (/[,;:—-]["”'’)]*$/.test(word) ? 180 / rate : 0);
+      });
+    }
+    function clearTimers() { clearTimeout(gapTimer); estTimers.forEach(clearTimeout); estTimers = []; }
+    function say(i) {
+      clearTimers();
+      if (i >= sents.length) { finish(); return; }
+      k = i; const sn = sents[i], my = ++token, v = curVoice(), tn = tone(sn.text);
+      const u = new SpeechSynthesisUtterance(sn.text.replace(/[“”]/g, '"'));
+      if (v) { u.voice = v; u.lang = v.lang; }
+      u.rate = tn.rate; u.pitch = tn.pitch;
+      let gotBoundary = false;
+      u.onstart = () => { if (my !== token) return; light(sn.ws[0] && sn.ws[0].wi); estTimers.push(setTimeout(() => { if (my === token && !gotBoundary) estimate(sn, tn.rate, my); }, 450)); };
+      u.onboundary = e => {
+        if (my !== token || (e.name && e.name !== "word")) return;
+        if (!gotBoundary) { gotBoundary = true; estTimers.forEach(clearTimeout); estTimers = []; }
+        const w = sn.ws.find(w => e.charIndex >= w.at && e.charIndex < w.end) || sn.ws.find(w => w.at >= e.charIndex);
+        if (w) light(w.wi);
+      };
+      u.onend = () => { if (my !== token || !playing) return; clearTimers(); gapTimer = setTimeout(() => { if (my === token && playing) say(i + 1); }, gapAfter(sn)); };
+      u.onerror = e => { if (my !== token || e.error === "interrupted" || e.error === "canceled") return; u.onend(); };
+      synth.speak(u);
+    }
+    function setBtn() { $("lPlay").textContent = playing ? "Pause" : (k >= sents.length ? "Play again" : "Play"); }
+    function finish() { playing = false; light(null); k = sents.length; setBtn(); }
+    function stop() { token++; playing = false; clearTimers(); if (synth) synth.cancel(); light(null); }
+    // Pause stops at the current sentence and Play picks it back up from the start of that sentence,
+    // which works the same in every browser (speechSynthesis.pause is unreliable on some).
+    function play(i) { if (!synth) return; stop(); playing = true; setBtn(); say(i || 0); }
+    function toggle() {
+      if (playing) { stop(); playing = false; setBtn(); }
+      else play(k >= sents.length ? 0 : k);
+    }
+    function sample(text) {
+      if (!synth) return; synth.cancel();
+      const u = new SpeechSynthesisUtterance(text), v = curVoice();
+      if (v) { u.voice = v; u.lang = v.lang; } u.rate = S.rate || 0.95; synth.speak(u);
+    }
+    return { render, play, stop, toggle, sample };
+  })();
 
   // ---- Questions ----------------------------------------------------------------------------------
   let qsFrom = "story", savedTimer = 0;
